@@ -1,7 +1,7 @@
 import { BookOpen, Compass, Eye, EyeOff, Pause, Shield, Sparkles, Volume2 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { AvatarId } from '../types';
-import { speakLines, speechSupported, stopSpeech } from '../utils/speech';
+import { hasEnglishVoice, speakLines, speechSupported, stopSpeech } from '../utils/speech';
 
 export const AVATARS: { id: AvatarId; name: string; blurb: string; color: string; Icon: typeof BookOpen }[] = [
   { id: 'scholar', name: 'Scholar', blurb: 'Reads every footnote.', color: '#e8b84a', Icon: BookOpen },
@@ -39,11 +39,23 @@ export function Panel({ children, className = '', title }: { children: ReactNode
 }
 
 /** Play/replay a dialogue with a transcript toggle; transcript is forced open without speech support. */
+/** null = still checking; false = no English voice on this device. */
+function useEnglishVoice() {
+  const [ok, setOk] = useState<boolean | null>(speechSupported() ? null : false);
+  useEffect(() => {
+    let live = true;
+    hasEnglishVoice().then((v) => live && setOk(v));
+    return () => { live = false; };
+  }, []);
+  return ok;
+}
+
 export function ListenPanel({ lines, rate }: { lines: { speaker: string; line: string }[]; rate: number }) {
-  const supported = speechSupported();
+  const english = useEnglishVoice();
+  const supported = english !== false;
   const [playing, setPlaying] = useState(false);
   const [plays, setPlays] = useState(0);
-  const [showText, setShowText] = useState(!supported);
+  const [showText, setShowText] = useState(false);
 
   useEffect(() => () => stopSpeech(), []);
 
@@ -72,9 +84,9 @@ export function ListenPanel({ lines, rate }: { lines: { speaker: string; line: s
           {playing && <span className="wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>}
         </div>
       ) : (
-        <p className="note">Your browser does not support speech playback, so the transcript is shown instead.</p>
+        <p className="note">No English voice is available on this device, so the transcript is shown instead. (To hear audio, add an English voice in your system's speech settings.)</p>
       )}
-      {showText && (
+      {(showText || !supported) && (
         <div className="transcript">
           {lines.map((l, i) => (
             <p key={i}><strong>{l.speaker}:</strong> {l.line}</p>
@@ -87,7 +99,8 @@ export function ListenPanel({ lines, rate }: { lines: { speaker: string; line: s
 
 /** Small "hear it" button used for speaking practice (model pronunciation). */
 export function SpeakButton({ text, rate, label = 'Hear it' }: { text: string; rate: number; label?: string }) {
-  if (!speechSupported()) return null;
+  const english = useEnglishVoice();
+  if (!english) return null;
   return (
     <button className="btn btn-ghost btn-sm" onClick={() => speakLines([{ speaker: 'A', line: text }], rate)} aria-label={`${label}: ${text}`}>
       <Volume2 size={16} /> {label}

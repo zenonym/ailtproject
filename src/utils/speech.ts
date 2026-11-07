@@ -21,6 +21,14 @@ function englishVoices() {
     .sort((a, b) => rankVoice(b) - rankVoice(a));
 }
 
+/** Resolves true if the device offers at least one English voice. */
+export function hasEnglishVoice(): Promise<boolean> {
+  return new Promise((res) => {
+    if (!speechSupported()) return res(false);
+    whenVoicesReady(() => res(englishVoices().length > 0));
+  });
+}
+
 /** Voices load asynchronously in some browsers (e.g. Chrome); wait briefly for them. */
 function whenVoicesReady(cb: () => void) {
   const synth = window.speechSynthesis;
@@ -46,16 +54,21 @@ export function speakLines(lines: { speaker: string; line: string }[], rate = 0.
   synth.cancel();
   whenVoicesReady(() => {
     const voices = englishVoices();
+    // Never read English with a non-English voice (it gives a strong foreign accent).
+    if (!voices.length) {
+      onEnd?.();
+      return;
+    }
     const speakers = [...new Set(lines.map((l) => l.speaker))];
     lines.forEach((l, i) => {
       const u = new SpeechSynthesisUtterance(l.line);
       const s = speakers.indexOf(l.speaker);
-      const voice = voices.length ? voices[Math.min(s, voices.length - 1)] : undefined;
-      if (voice) u.voice = voice;
-      u.lang = voice?.lang ?? 'en-GB';
+      const voice = voices[Math.min(s, voices.length - 1)];
+      u.voice = voice;
+      u.lang = voice.lang;
       u.rate = rate;
       // If both speakers share one voice, vary pitch so they still sound different.
-      u.pitch = voices.length > s ? 1 : s % 2 === 0 ? 1 : 0.8;
+      u.pitch = voices.length > s || s % 2 === 0 ? 1 : 0.8;
       if (i === lines.length - 1 && onEnd) {
         u.onend = onEnd;
         u.onerror = onEnd;

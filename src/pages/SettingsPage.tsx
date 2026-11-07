@@ -1,14 +1,15 @@
 import { ArrowLeft, Trash2, Volume2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Update } from '../App';
 import { ConfirmDialog, Panel } from '../components/ui';
 import type { SaveData } from '../types';
-import { speakText, speechSupported } from '../utils/speech';
+import { hasEnglishVoice, speakText } from '../utils/speech';
 
 export function SettingsPage({ save, update, onBack, onReset }: { save: SaveData | null; update: Update; onBack: () => void; onReset: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [rate, setRate] = useState(save?.settings.speechRate ?? 0.9);
-  const supported = speechSupported();
+  const [supported, setSupported] = useState(true);
+  useEffect(() => { hasEnglishVoice().then(setSupported); }, []);
 
   return (
     <div className="page narrow">
@@ -29,7 +30,7 @@ export function SettingsPage({ save, update, onBack, onReset }: { save: SaveData
             {!save && <p className="note">Start an adventure to save your speed preference.</p>}
           </>
         ) : (
-          <p className="note">Speech playback is not supported in this browser. Listening activities will show a written transcript instead.</p>
+          <p className="note">No English voice is available in this browser, so listening activities show a written transcript. On Windows, add one under Settings → Time & language → Speech → Add voices (e.g. English (United Kingdom)), then restart the browser.</p>
         )}
       </Panel>
 
